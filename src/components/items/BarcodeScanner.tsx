@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { X, Camera, Loader2, RotateCcw } from 'lucide-react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
-import { NotFoundException } from '@zxing/library'
 
 interface ScanResult {
   barcode: string
@@ -99,8 +98,8 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
 
             const info = await lookupBarcode(barcode)
             onResult(info)
-          } else if (err && !(err instanceof NotFoundException)) {
-            // Only surface non-NotFoundException errors
+          } else if (err && !String(err).includes('NotFoundException')) {
+            // Only surface non-NotFoundException errors (NotFoundException fires every frame when no barcode visible)
             console.warn('Scanner error:', err)
           }
         }
