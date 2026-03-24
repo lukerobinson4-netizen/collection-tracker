@@ -40,6 +40,8 @@ export interface Shelf {
   name: string
   slots_wide: number
   slots_tall: number
+  position_x: number | null
+  position_y: number | null
   created_at: string
   updated_at: string
 }

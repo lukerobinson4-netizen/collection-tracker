@@ -40,6 +40,8 @@ create table if not exists public.shelves (
   name        text not null,
   slots_wide  integer not null default 6 check (slots_wide between 1 and 30),
   slots_tall  integer not null default 4 check (slots_tall between 1 and 20),
+  position_x  integer,   -- room map grid position (in cells)
+  position_y  integer,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -172,4 +174,8 @@ alter table public.collections
 alter table public.items
   add column if not exists tags     text[] not null default '{}',
   add column if not exists wishlist boolean not null default false;
+
+alter table public.shelves
+  add column if not exists position_x integer,
+  add column if not exists position_y integer;
 */

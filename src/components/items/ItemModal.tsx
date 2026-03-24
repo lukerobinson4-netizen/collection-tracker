@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Camera, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react'
+import { Camera, Bookmark, BookmarkCheck, Trash2, ScanLine } from 'lucide-react'
 import clsx from 'clsx'
 import Modal from '../shared/Modal'
 import Button from '../shared/Button'
+import BarcodeScanner from './BarcodeScanner'
 import type { Item, Shelf } from '../../lib/types'
 import type { CollectionTypeConfig } from '../../lib/collectionTypes'
 import { useUpsertItem, useDeleteItem, uploadPhoto } from '../../hooks/useData'
@@ -42,6 +43,7 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
   const [form, setForm] = useState<FormData>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   // Slot picker state
   const [selectedShelfId, setSelectedShelfId] = useState<string | null>(null)
@@ -140,11 +142,30 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
     onClose()
   }
 
+  const handleScanResult = (result: { barcode: string; name?: string; brand?: string; type?: string }) => {
+    setScannerOpen(false)
+    if (result.name) set('name', result.name)
+    if (result.brand) set('brand', result.brand)
+    if (result.type) set('type', result.type)
+  }
+
   return (
+    <>
+    {scannerOpen && <BarcodeScanner onResult={handleScanResult} onClose={() => setScannerOpen(false)} />}
     <Modal
       open={open}
       onClose={onClose}
-      title={isEditing ? `Edit ${cfg.itemLabel}` : `Add ${cfg.itemLabel}`}
+      title={
+        <div className="flex items-center justify-between w-full pr-8">
+          <span>{isEditing ? `Edit ${cfg.itemLabel}` : `Add ${cfg.itemLabel}`}</span>
+          {!isEditing && (
+            <button onClick={() => setScannerOpen(true)}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-[#2a2a2a] text-[#666] hover:text-white hover:border-[#3a3a3a] transition-all">
+              <ScanLine size={13} /> Scan Barcode
+            </button>
+          )}
+        </div>
+      }
       size="xl"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -365,5 +386,6 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
         )}
       </div>
     </Modal>
+    </>
   )
 }

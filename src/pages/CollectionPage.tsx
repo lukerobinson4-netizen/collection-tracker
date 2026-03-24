@@ -12,6 +12,7 @@ import type { CollectionType, DisplayMode, Room, Shelf, Item } from '../lib/type
 import ShelfView from '../components/views/ShelfView'
 import GridView from '../components/views/GridView'
 import ListView from '../components/views/ListView'
+import RoomMapView from '../components/views/RoomMapView'
 import ItemModal from '../components/items/ItemModal'
 import Modal from '../components/shared/Modal'
 import Button from '../components/shared/Button'
@@ -127,18 +128,39 @@ function CollectionSettingsModal({ open, onClose, collectionId, accent }: { open
   const [name, setName] = useState(col?.name ?? '')
   const [desc, setDesc] = useState(col?.description ?? '')
   const [displayMode, setDisplayMode] = useState<DisplayMode>(col?.display_mode ?? 'shelf')
+  const [isPublic, setIsPublic] = useState(col?.is_public ?? false)
+  const [publicSlug, setPublicSlug] = useState(col?.public_slug ?? '')
   const cfg = col ? getConfig(col.type as CollectionType) : null
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (open && col) { setName(col.name); setDesc(col.description ?? ''); setDisplayMode(col.display_mode) }
+    if (open && col) {
+      setName(col.name); setDesc(col.description ?? ''); setDisplayMode(col.display_mode)
+      setIsPublic(col.is_public); setPublicSlug(col.public_slug ?? '')
+    }
   }, [open, col])
+
+  const generateSlug = () => {
+    const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Math.random().toString(36).slice(2, 7)}`
+    setPublicSlug(slug)
+  }
+
+  const copyLink = () => {
+    const url = `${window.location.origin}/share/${publicSlug}`
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const save = async () => {
     setLoading(true)
     try {
       const sb = getSupabase()
-      const { data, error } = await sb.from('collections').update({ name, description: desc || null, display_mode: displayMode }).eq('id', collectionId).select().single()
+      const updates: Record<string, unknown> = { name, description: desc || null, display_mode: displayMode, is_public: isPublic }
+      if (isPublic && !publicSlug) generateSlug()
+      if (publicSlug) updates.public_slug = publicSlug
+      const { data, error } = await sb.from('collections').update(updates).eq('id', collectionId).select().single()
       if (error) throw error
       setCollections(collections.map(c => c.id === collectionId ? data : c))
       addToast('Settings saved')
@@ -174,6 +196,37 @@ function CollectionSettingsModal({ open, onClose, collectionId, accent }: { open
             </div>
           </div>
         )}
+
+        {/* Share */}
+        <div className="border-t border-[#1e1e1e] pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <label className="mb-0">Public share link</label>
+            <button
+              onClick={() => { setIsPublic(v => !v); if (!publicSlug) generateSlug() }}
+              className={clsx('relative w-10 h-5 rounded-full transition-colors', isPublic ? 'bg-[var(--accent)]' : 'bg-[#333]')}
+              style={{ '--accent': accent } as React.CSSProperties}
+            >
+              <span className={clsx('absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform', isPublic ? 'translate-x-5' : 'translate-x-0.5')} />
+            </button>
+          </div>
+          {isPublic && (
+            <div className="space-y-2">
+              <div className="flex gap-1">
+                <input value={publicSlug} onChange={e => setPublicSlug(e.target.value.replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="your-slug" className="flex-1 text-xs" />
+                <button onClick={generateSlug} className="px-2 py-1 text-xs border border-[#2a2a2a] rounded-lg text-[#666] hover:text-white transition-colors whitespace-nowrap">
+                  Regenerate
+                </button>
+              </div>
+              {publicSlug && (
+                <button onClick={copyLink}
+                  className="w-full text-xs text-left px-3 py-2 bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] text-[#666] hover:text-white transition-colors truncate">
+                  {copied ? '✓ Copied!' : `${window.location.origin}/share/${publicSlug}`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   )
@@ -341,6 +394,17 @@ export default function CollectionPage() {
           <ListView items={filteredItems} cfg={cfg} accent={accent} showWishlist={showWishlist}
             onItemClick={item => setItemModal({ open: true, item })}
             onAddItem={() => setItemModal({ open: true })}
+          />
+        )}
+        {displayMode === 'room' && (
+          <RoomMapView
+            rooms={rooms} shelves={shelves} items={filteredItems} cfg={cfg} accent={accent}
+            collectionId={id!}
+            onItemClick={item => setItemModal({ open: true, item })}
+            onAddRoom={() => setRoomModal({ open: true })}
+            onEditRoom={room => setRoomModal({ open: true, room })}
+            onAddShelf={roomId => setShelfModal({ open: true, roomId })}
+            onEditShelf={shelf => setShelfModal({ open: true, shelf })}
           />
         )}
       </div>

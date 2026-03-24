@@ -5,7 +5,7 @@ import clsx from 'clsx'
 interface Props {
   open: boolean
   onClose: () => void
-  title?: string
+  title?: string | React.ReactNode
   children: React.ReactNode
   footer?: React.ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'

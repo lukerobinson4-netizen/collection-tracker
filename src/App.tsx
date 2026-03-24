@@ -7,6 +7,7 @@ import SetupPage from './pages/SetupPage'
 import DashboardPage from './pages/DashboardPage'
 import CollectionPage from './pages/CollectionPage'
 import StatsPage from './pages/StatsPage'
+import SharePage from './pages/SharePage'
 import ToastContainer from './components/shared/Toast'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -78,6 +79,7 @@ export default function App() {
         <Route path="/stats" element={
           <AuthGuard><StatsPage /></AuthGuard>
         } />
+        <Route path="/share/:slug" element={<SharePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <ToastContainer />
