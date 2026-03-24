@@ -1,160 +1,175 @@
--- Collection Tracker — Supabase Schema
--- Run this in your Supabase SQL editor
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Collection Tracker v2 — Supabase Schema
+-- Run this in the Supabase SQL editor for a fresh setup.
+-- For existing installs, run the migration block at the bottom.
+-- ═══════════════════════════════════════════════════════════════════════════
 
--- ─── Extensions ─────────────────────────────────────────────────────────────
 create extension if not exists "uuid-ossp";
 
--- ─── Tables ─────────────────────────────────────────────────────────────────
-
-create table collections (
-  id           uuid primary key default gen_random_uuid(),
-  user_id      uuid references auth.users(id) on delete cascade not null,
-  name         text not null,
-  type         text not null default 'custom',   -- whiskey | wine | beer | books | custom
-  icon         text default '📦',
-  description  text,
-  accent_color text default '#c8a96e',
-  created_at   timestamptz default now(),
-  updated_at   timestamptz default now()
+-- ─── collections ─────────────────────────────────────────────────────────────
+create table if not exists public.collections (
+  id            uuid primary key default uuid_generate_v4(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  name          text not null,
+  type          text not null default 'custom',
+  description   text,
+  display_mode  text not null default 'shelf',
+  accent_color  text,
+  is_public     boolean not null default false,
+  public_slug   text unique,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
-create table rooms (
-  id            uuid primary key default gen_random_uuid(),
-  collection_id uuid references collections(id) on delete cascade not null,
+-- ─── rooms ───────────────────────────────────────────────────────────────────
+create table if not exists public.rooms (
+  id            uuid primary key default uuid_generate_v4(),
+  collection_id uuid not null references public.collections(id) on delete cascade,
   name          text not null,
   description   text,
-  sort_order    int default 0,
-  created_at    timestamptz default now()
+  position_x    integer,
+  position_y    integer,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
-create table shelves (
-  id         uuid primary key default gen_random_uuid(),
-  room_id    uuid references rooms(id) on delete cascade not null,
-  name       text not null,
-  slots_wide int not null default 6,
-  slots_tall int not null default 4,
-  wall       text default 'north',    -- north | south | east | west | centre
-  sort_order int default 0,
-  created_at timestamptz default now()
+-- ─── shelves ─────────────────────────────────────────────────────────────────
+create table if not exists public.shelves (
+  id          uuid primary key default uuid_generate_v4(),
+  room_id     uuid not null references public.rooms(id) on delete cascade,
+  name        text not null,
+  slots_wide  integer not null default 6 check (slots_wide between 1 and 30),
+  slots_tall  integer not null default 4 check (slots_tall between 1 and 20),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
 
-create table items (
-  id             uuid primary key default gen_random_uuid(),
-  collection_id  uuid references collections(id) on delete cascade not null,
-  shelf_id       uuid references shelves(id) on delete set null,
-  slot_row       int,
-  slot_col       int,
-  name           text not null,
-  brand          text,
-  type           text,
-  subtype        text,
-  photo_url      text,
-  rating         numeric(3,1) check (rating >= 0 and rating <= 10),
-  notes          text,
-  purchase_price numeric(10,2),
-  purchase_date  date,
-  purchase_store text,
-  status         text default 'full',  -- full | partial | empty | gifted | sold
-  year           int,
-  region         text,
-  abv            numeric(4,1),
-  custom_fields  jsonb default '{}',
-  created_at     timestamptz default now(),
-  updated_at     timestamptz default now()
+-- ─── items ───────────────────────────────────────────────────────────────────
+create table if not exists public.items (
+  id              uuid primary key default uuid_generate_v4(),
+  collection_id   uuid not null references public.collections(id) on delete cascade,
+  shelf_id        uuid references public.shelves(id) on delete set null,
+  shelf_row       integer,
+  shelf_col       integer,
+  name            text not null,
+  brand           text,
+  type            text,
+  year            integer,
+  region          text,
+  abv             numeric(5,2),
+  notes           text,
+  rating          numeric(3,1) check (rating between 0 and 10),
+  status          text not null default 'owned',
+  purchase_price  numeric(10,2),
+  purchase_date   date,
+  purchase_store  text,
+  photo_url       text,
+  tags            text[] not null default '{}',
+  wishlist        boolean not null default false,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
 );
 
--- ─── Row Level Security ──────────────────────────────────────────────────────
+-- ─── Indexes ─────────────────────────────────────────────────────────────────
+create index if not exists idx_collections_user_id on public.collections(user_id);
+create index if not exists idx_rooms_collection_id on public.rooms(collection_id);
+create index if not exists idx_shelves_room_id     on public.shelves(room_id);
+create index if not exists idx_items_collection_id on public.items(collection_id);
+create index if not exists idx_items_shelf_id      on public.items(shelf_id);
+create index if not exists idx_items_wishlist      on public.items(collection_id, wishlist);
 
-alter table collections enable row level security;
-alter table rooms       enable row level security;
-alter table shelves     enable row level security;
-alter table items       enable row level security;
+-- ─── Updated_at triggers ─────────────────────────────────────────────────────
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end;
+$$;
 
--- Collections
-create policy "Own collections — select" on collections for select using (auth.uid() = user_id);
-create policy "Own collections — insert" on collections for insert with check (auth.uid() = user_id);
-create policy "Own collections — update" on collections for update using (auth.uid() = user_id);
-create policy "Own collections — delete" on collections for delete using (auth.uid() = user_id);
+do $$ begin
+  create trigger trg_collections_updated before update on public.collections
+    for each row execute function public.set_updated_at();
+  exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create trigger trg_rooms_updated before update on public.rooms
+    for each row execute function public.set_updated_at();
+  exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create trigger trg_shelves_updated before update on public.shelves
+    for each row execute function public.set_updated_at();
+  exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create trigger trg_items_updated before update on public.items
+    for each row execute function public.set_updated_at();
+  exception when duplicate_object then null;
+end $$;
 
--- Rooms (owned via collection)
-create policy "Own rooms — select" on rooms for select using (
-  exists (select 1 from collections where id = rooms.collection_id and user_id = auth.uid())
-);
-create policy "Own rooms — insert" on rooms for insert with check (
-  exists (select 1 from collections where id = collection_id and user_id = auth.uid())
-);
-create policy "Own rooms — update" on rooms for update using (
-  exists (select 1 from collections where id = rooms.collection_id and user_id = auth.uid())
-);
-create policy "Own rooms — delete" on rooms for delete using (
-  exists (select 1 from collections where id = rooms.collection_id and user_id = auth.uid())
-);
+-- ─── Row Level Security ───────────────────────────────────────────────────────
+alter table public.collections enable row level security;
+alter table public.rooms       enable row level security;
+alter table public.shelves     enable row level security;
+alter table public.items       enable row level security;
 
--- Shelves (owned via room → collection)
-create policy "Own shelves — select" on shelves for select using (
-  exists (
-    select 1 from rooms r join collections c on c.id = r.collection_id
-    where r.id = shelves.room_id and c.user_id = auth.uid()
-  )
-);
-create policy "Own shelves — insert" on shelves for insert with check (
-  exists (
-    select 1 from rooms r join collections c on c.id = r.collection_id
+create policy "collections_owner" on public.collections
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "collections_public_read" on public.collections
+  for select using (is_public = true);
+
+create policy "rooms_owner" on public.rooms
+  using (exists (
+    select 1 from public.collections c where c.id = collection_id and c.user_id = auth.uid()
+  ))
+  with check (exists (
+    select 1 from public.collections c where c.id = collection_id and c.user_id = auth.uid()
+  ));
+
+create policy "shelves_owner" on public.shelves
+  using (exists (
+    select 1 from public.rooms r
+    join public.collections c on c.id = r.collection_id
     where r.id = room_id and c.user_id = auth.uid()
-  )
-);
-create policy "Own shelves — update" on shelves for update using (
-  exists (
-    select 1 from rooms r join collections c on c.id = r.collection_id
-    where r.id = shelves.room_id and c.user_id = auth.uid()
-  )
-);
-create policy "Own shelves — delete" on shelves for delete using (
-  exists (
-    select 1 from rooms r join collections c on c.id = r.collection_id
-    where r.id = shelves.room_id and c.user_id = auth.uid()
-  )
-);
+  ))
+  with check (exists (
+    select 1 from public.rooms r
+    join public.collections c on c.id = r.collection_id
+    where r.id = room_id and c.user_id = auth.uid()
+  ));
 
--- Items (owned via collection)
-create policy "Own items — select" on items for select using (
-  exists (select 1 from collections where id = items.collection_id and user_id = auth.uid())
-);
-create policy "Own items — insert" on items for insert with check (
-  exists (select 1 from collections where id = collection_id and user_id = auth.uid())
-);
-create policy "Own items — update" on items for update using (
-  exists (select 1 from collections where id = items.collection_id and user_id = auth.uid())
-);
-create policy "Own items — delete" on items for delete using (
-  exists (select 1 from collections where id = items.collection_id and user_id = auth.uid())
-);
+create policy "items_owner" on public.items
+  using (exists (
+    select 1 from public.collections c where c.id = collection_id and c.user_id = auth.uid()
+  ))
+  with check (exists (
+    select 1 from public.collections c where c.id = collection_id and c.user_id = auth.uid()
+  ));
 
--- ─── Triggers ────────────────────────────────────────────────────────────────
+-- ─── Storage: item-photos bucket ─────────────────────────────────────────────
+insert into storage.buckets (id, name, public) values ('item-photos', 'item-photos', true)
+  on conflict (id) do nothing;
 
-create or replace function update_updated_at()
-returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
+create policy "item_photos_upload" on storage.objects for insert
+  with check (bucket_id = 'item-photos' and auth.uid()::text = (storage.foldername(name))[1]);
+create policy "item_photos_update" on storage.objects for update
+  using (bucket_id = 'item-photos' and auth.uid()::text = (storage.foldername(name))[1]);
+create policy "item_photos_delete" on storage.objects for delete
+  using (bucket_id = 'item-photos' and auth.uid()::text = (storage.foldername(name))[1]);
+create policy "item_photos_public_read" on storage.objects for select
+  using (bucket_id = 'item-photos');
 
-create trigger collections_updated_at before update on collections
-  for each row execute function update_updated_at();
 
-create trigger items_updated_at before update on items
-  for each row execute function update_updated_at();
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION — upgrading from v1 (run these if you already have a database)
+-- ═══════════════════════════════════════════════════════════════════════════
+/*
+alter table public.collections
+  add column if not exists display_mode text not null default 'shelf',
+  add column if not exists accent_color text,
+  add column if not exists is_public    boolean not null default false,
+  add column if not exists public_slug  text unique;
 
--- ─── Storage ─────────────────────────────────────────────────────────────────
--- In Supabase dashboard → Storage, create a bucket named: item-photos
--- Set it to PUBLIC so photo URLs work without auth tokens.
--- Add the following storage policy:
---
---   Policy name: Authenticated users can manage their own photos
---   Target roles: authenticated
---   Allowed operations: SELECT, INSERT, UPDATE, DELETE
---   Policy definition:
---     (storage.foldername(name))[1] = auth.uid()::text
---
--- This ensures each user's photos are stored under their user ID folder.
+alter table public.items
+  add column if not exists tags     text[] not null default '{}',
+  add column if not exists wishlist boolean not null default false;
+*/

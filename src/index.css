@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  html { color-scheme: dark; }
+
+  body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #f0f0f0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* safe area for notch phones */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  /* Focus ring */
+  *:focus-visible { outline: 2px solid var(--accent, #d97706); outline-offset: 2px; border-radius: 4px; }
+
+  input, textarea, select {
+    @apply bg-[#1c1c1c] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white w-full transition-colors;
+  }
+  input:focus, textarea:focus, select:focus {
+    @apply outline-none;
+    border-color: var(--accent, #d97706);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #d97706) 25%, transparent);
+  }
+  select option { background: #1c1c1c; }
+  textarea { resize: vertical; }
+
+  label { @apply block text-xs text-[#888] font-medium mb-1 uppercase tracking-wide; }
+}
+
+@layer utilities {
+  .font-display { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
+  .font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* Shelf wood effect */
+  .shelf-wood {
+    background: linear-gradient(180deg, #5c3d1e 0%, #4a2f14 60%, #3d2510 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.5);
+  }
+
+  /* Glass morphism card */
+  .glass {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* Touch target min size for mobile */
+  .touch-target { min-height: 44px; min-width: 44px; }
+
+  /* Accent color utilities (set via CSS var --accent) */
+  .accent-border { border-color: var(--accent, #d97706) !important; }
+  .accent-text { color: var(--accent, #d97706) !important; }
+  .accent-bg { background-color: var(--accent, #d97706) !important; }
+  .accent-ring { box-shadow: 0 0 0 2px var(--accent, #d97706) !important; }
+}
