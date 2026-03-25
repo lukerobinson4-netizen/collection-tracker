@@ -110,7 +110,8 @@ export default function ProfilePage() {
       const sb = getSupabase()
       await sb.auth.signOut()
     } catch { /* ignore */ }
-    clearConfig()
+    // Keep Supabase config (URL + anon key) so the user doesn't have to re-enter
+    // credentials after signing back in, especially on iOS PWA.
     resetClient()
     setUser(null)
     navigate('/auth', { replace: true })
