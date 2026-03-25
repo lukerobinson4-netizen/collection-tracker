@@ -16,8 +16,8 @@ const variants = {
   danger: 'text-red-400 hover:text-red-300 hover:bg-red-500/10 active:scale-[0.98]',
 }
 const sizes = {
-  sm: 'h-8 px-3 text-xs rounded-lg',
-  md: 'h-9 px-4 text-sm rounded-lg',
+  sm: 'h-11 px-3 text-xs rounded-lg sm:h-8',
+  md: 'h-11 px-4 text-sm rounded-lg sm:h-9',
   lg: 'h-11 px-6 text-base rounded-xl',
 }
 

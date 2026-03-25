@@ -27,8 +27,17 @@
   *:focus-visible { outline: 2px solid var(--accent, #d97706); outline-offset: 2px; border-radius: 4px; }
 
   input, textarea, select {
-    @apply bg-[#1c1c1c] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white w-full transition-colors;
+    @apply bg-[#1c1c1c] border border-[#2a2a2a] rounded-lg px-3 py-2 text-white w-full transition-colors;
+    /* 16px prevents iOS Safari auto-zoom on focus */
+    font-size: 16px;
+    line-height: 1.4;
+    min-height: 44px;
   }
+  /* Restore smaller size on large screens where zoom isn't an issue */
+  @media (min-width: 640px) {
+    input, textarea, select { font-size: 14px; min-height: 38px; }
+  }
+  textarea { min-height: 80px; }
   input:focus, textarea:focus, select:focus {
     @apply outline-none;
     border-color: var(--accent, #d97706);
