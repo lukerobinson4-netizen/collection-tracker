@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Settings } from 'lucide-react'
+import { ChevronDown, ChevronUp, Settings, Link } from 'lucide-react'
 import { getSupabase, saveConfig, isConfigured, getStoredConfig, resetClient } from '../lib/supabase'
 import { useAppStore } from '../stores/appStore'
 import Button from '../components/shared/Button'
@@ -14,9 +14,29 @@ export default function AuthPage() {
   const [sbUrl, setSbUrl] = useState('')
   const [sbKey, setSbKey] = useState('')
   const [configSaved, setConfigSaved] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const setUser = useAppStore(s => s.setUser)
 
   useEffect(() => {
+    // Auto-apply credentials from ?setup= URL param (used for PWA transfer)
+    const params = new URLSearchParams(window.location.search)
+    const setup = params.get('setup')
+    if (setup) {
+      try {
+        const { url, key } = JSON.parse(atob(setup))
+        if (url && key) {
+          saveConfig(url, key)
+          resetClient()
+          setSbUrl(url)
+          setSbKey(key)
+          setConfigSaved(true)
+          setTimeout(() => setConfigSaved(false), 3000)
+          // Remove the param from the URL without reloading
+          window.history.replaceState({}, '', window.location.pathname)
+        }
+      } catch { /* ignore malformed param */ }
+    }
+
     const cfg = getStoredConfig()
     if (cfg) { setSbUrl(cfg.url); setSbKey(cfg.anonKey) }
     else setShowConfig(true)
@@ -28,6 +48,15 @@ export default function AuthPage() {
     resetClient()
     setConfigSaved(true)
     setTimeout(() => setConfigSaved(false), 2000)
+  }
+
+  const handleCopySetupLink = () => {
+    const encoded = btoa(JSON.stringify({ url: sbUrl.trim(), key: sbKey.trim() }))
+    const link = `${window.location.origin}/auth?setup=${encoded}`
+    navigator.clipboard.writeText(link).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2500)
+    })
   }
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -124,9 +153,23 @@ export default function AuthPage() {
                 <input type="text" value={sbKey} onChange={e => setSbKey(e.target.value)}
                   placeholder="eyJ..." />
               </div>
-              <Button onClick={handleSaveConfig} variant="secondary" size="sm">
-                {configSaved ? '✓ Saved' : 'Save credentials'}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveConfig} variant="secondary" size="sm">
+                  {configSaved ? '✓ Saved' : 'Save credentials'}
+                </Button>
+                {sbUrl.trim() && sbKey.trim() && (
+                  <Button onClick={handleCopySetupLink} variant="ghost" size="sm"
+                    title="Copy a link you can open on another device (e.g. iPhone PWA) to auto-fill these credentials">
+                    <Link size={13} />
+                    {linkCopied ? 'Copied!' : 'Copy setup link'}
+                  </Button>
+                )}
+              </div>
+              {linkCopied && (
+                <p className="text-xs text-[#666]">
+                  Open that link in the installed PWA on your iPhone — credentials will load automatically.
+                </p>
+              )}
             </div>
           )}
         </div>
