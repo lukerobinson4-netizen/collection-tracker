@@ -67,6 +67,12 @@ export interface Item {
   photo_url: string | null
   tags: string[]
   wishlist: boolean
+  market_price_low: number | null
+  market_price_avg: number | null
+  market_price_high: number | null
+  market_price_currency: string | null
+  market_price_source: string | null
+  market_price_updated: string | null
   created_at: string
   updated_at: string
 }

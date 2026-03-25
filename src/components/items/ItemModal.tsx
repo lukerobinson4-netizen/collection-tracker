@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Camera, Bookmark, BookmarkCheck, Trash2, ScanLine } from 'lucide-react'
+import { Camera, Bookmark, BookmarkCheck, Trash2, ScanLine, TrendingUp } from 'lucide-react'
 import clsx from 'clsx'
 import Modal from '../shared/Modal'
 import Button from '../shared/Button'
 import BarcodeScanner from './BarcodeScanner'
+import type { LookupResult } from '../../lib/lookup'
 import type { Item, Shelf } from '../../lib/types'
 import type { CollectionTypeConfig } from '../../lib/collectionTypes'
 import { useUpsertItem, useDeleteItem, uploadPhoto } from '../../hooks/useData'
@@ -62,6 +63,12 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
         purchase_price: item.purchase_price, purchase_date: item.purchase_date,
         purchase_store: item.purchase_store, photo_url: item.photo_url,
         tags: item.tags, wishlist: item.wishlist,
+        market_price_low: item.market_price_low,
+        market_price_avg: item.market_price_avg,
+        market_price_high: item.market_price_high,
+        market_price_currency: item.market_price_currency,
+        market_price_source: item.market_price_source,
+        market_price_updated: item.market_price_updated,
       })
       setPhotoPreview(item.photo_url ?? null)
       setSelectedShelfId(item.shelf_id ?? null)
@@ -128,6 +135,12 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
         shelf_id: selectedShelfId,
         shelf_row: selectedRow,
         shelf_col: selectedCol,
+        market_price_low: form.market_price_low ?? null,
+        market_price_avg: form.market_price_avg ?? null,
+        market_price_high: form.market_price_high ?? null,
+        market_price_currency: form.market_price_currency ?? null,
+        market_price_source: form.market_price_source ?? null,
+        market_price_updated: form.market_price_updated ?? null,
       })
       onClose()
     } catch { /* error shown via toast */ } finally {
@@ -142,11 +155,25 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
     onClose()
   }
 
-  const handleScanResult = (result: { barcode: string; name?: string; brand?: string; type?: string }) => {
+  const handleScanResult = (result: LookupResult) => {
     setScannerOpen(false)
     if (result.name) set('name', result.name)
     if (result.brand) set('brand', result.brand)
     if (result.type) set('type', result.type)
+    // Auto-fill product image (stored as external URL — no upload needed)
+    if (result.imageUrl && !form.photo_url) {
+      set('photo_url', result.imageUrl)
+      setPhotoPreview(result.imageUrl)
+    }
+    // Store market prices
+    if (result.prices) {
+      set('market_price_low', result.prices.low)
+      set('market_price_avg', result.prices.avg)
+      set('market_price_high', result.prices.high)
+      set('market_price_currency', result.prices.currency)
+      set('market_price_source', result.prices.source)
+      set('market_price_updated', result.prices.updated)
+    }
   }
 
   return (
@@ -289,6 +316,44 @@ export default function ItemModal({ open, onClose, item, defaultShelfId, default
             style={{ '--accent': accent } as React.CSSProperties}
           />
         </div>
+
+        {/* Market prices (populated via barcode scan) */}
+        {(form.market_price_low != null || form.market_price_avg != null || form.market_price_high != null) && (
+          <div className="bg-[#0f0f0f] border border-[#2a2a2a] rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2.5">
+              <TrendingUp size={13} className="text-[#555]" />
+              <span className="text-xs text-[#555] uppercase tracking-wide">Market Prices</span>
+              {form.market_price_source && (
+                <span className="ml-auto text-xs text-[#333]">via {form.market_price_source}</span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-2.5">
+              {[
+                { label: 'Low', val: form.market_price_low, color: '#10b981' },
+                { label: 'Avg', val: form.market_price_avg, color: '#f59e0b' },
+                { label: 'High', val: form.market_price_high, color: '#ef4444' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="text-center bg-[#141414] rounded-lg py-2">
+                  <p className="text-xs text-[#444] mb-1">{label}</p>
+                  <p className="font-mono font-semibold text-sm" style={{ color }}>
+                    {val != null
+                      ? val.toLocaleString('en-US', { style: 'currency', currency: form.market_price_currency ?? 'USD', maximumFractionDigits: 0 })
+                      : '—'}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {form.market_price_avg != null && (
+              <button
+                type="button"
+                onClick={() => set('purchase_price', form.market_price_avg)}
+                className="text-xs text-[#555] hover:text-[#888] transition-colors underline underline-offset-2"
+              >
+                Use avg as purchase price
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Notes */}
         <div>

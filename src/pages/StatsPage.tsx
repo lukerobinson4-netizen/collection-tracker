@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Star, Package, DollarSign, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Star, Package, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useItems, useCollections } from '../hooks/useData'
 import { getConfig } from '../lib/collectionTypes'
@@ -68,7 +68,18 @@ export default function StatsPage() {
     // Top rated
     const topRated = owned.filter(i => i.rating != null).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 5)
 
-    return { owned, wishlist, avgRating, totalValue, avgValue, byType, byStatus, ratingBuckets, topRated }
+    // Market value (using avg market prices from barcode lookups)
+    const withMarketPrice = owned.filter(i => i.market_price_avg != null)
+    const marketValueTotal = withMarketPrice.reduce((a, b) => a + (b.market_price_avg ?? 0), 0)
+    const purchaseValueForSame = withMarketPrice.filter(i => i.purchase_price != null).reduce((a, b) => a + (b.purchase_price ?? 0), 0)
+    const marketVsPurchase = purchaseValueForSame > 0 ? marketValueTotal - purchaseValueForSame : null
+
+    // Top valued by market price
+    const topByMarket = [...withMarketPrice]
+      .sort((a, b) => (b.market_price_avg ?? 0) - (a.market_price_avg ?? 0))
+      .slice(0, 5)
+
+    return { owned, wishlist, avgRating, totalValue, avgValue, byType, byStatus, ratingBuckets, topRated, withMarketPrice, marketValueTotal, marketVsPurchase, topByMarket }
   }, [items])
 
   const maxType = Math.max(...Object.values(stats.byType), 1)
@@ -134,6 +145,70 @@ export default function StatsPage() {
                 <Bar key={i} label={label} value={stats.ratingBuckets[i]} max={Math.max(...stats.ratingBuckets, 1)} color={accent} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Market value */}
+        {stats.withMarketPrice.length > 0 && (
+          <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl p-4 space-y-4">
+            <h2 className="text-xs text-[#555] uppercase tracking-wide">Market Value</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="bg-[#0f0f0f] rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 text-[#555] mb-1">
+                  <TrendingUp size={13} /><span className="text-xs">Est. Market Value</span>
+                </div>
+                <div className="text-xl font-semibold font-mono">
+                  ${stats.marketValueTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-xs text-[#444] mt-0.5">{stats.withMarketPrice.length} of {stats.owned.length} items priced</div>
+              </div>
+              {stats.marketVsPurchase != null && (
+                <div className="bg-[#0f0f0f] rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-2 text-[#555] mb-1">
+                    {stats.marketVsPurchase >= 0
+                      ? <TrendingUp size={13} className="text-green-400" />
+                      : <TrendingDown size={13} className="text-red-400" />}
+                    <span className="text-xs">vs Purchase Price</span>
+                  </div>
+                  <div className={`text-xl font-semibold font-mono ${stats.marketVsPurchase >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {stats.marketVsPurchase >= 0 ? '+' : ''}{stats.marketVsPurchase.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-xs text-[#444] mt-0.5">on items with both prices</div>
+                </div>
+              )}
+            </div>
+
+            {/* Top by market value */}
+            {stats.topByMarket.length > 0 && (
+              <div>
+                <h3 className="text-xs text-[#444] mb-2">Most Valuable</h3>
+                <div className="space-y-2">
+                  {stats.topByMarket.map((item, i) => (
+                    <div key={item.id} className="flex items-center gap-3">
+                      <span className="text-xs text-[#444] font-mono w-4">{i + 1}</span>
+                      {item.photo_url
+                        ? <img src={item.photo_url} className="w-8 h-8 rounded object-cover" alt="" />
+                        : <div className="w-8 h-8 rounded bg-[#1c1c1c] flex items-center justify-center text-sm">{cfg.icon}</div>
+                      }
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.name}</p>
+                        {item.brand && <p className="text-xs text-[#555] truncate">{item.brand}</p>}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-mono text-sm font-semibold text-[#f59e0b]">
+                          {(item.market_price_avg ?? 0).toLocaleString('en-US', { style: 'currency', currency: item.market_price_currency ?? 'USD', maximumFractionDigits: 0 })}
+                        </p>
+                        {item.purchase_price != null && (
+                          <p className="text-xs text-[#444]">
+                            paid {item.purchase_price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

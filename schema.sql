@@ -178,4 +178,13 @@ alter table public.items
 alter table public.shelves
   add column if not exists position_x integer,
   add column if not exists position_y integer;
+
+-- v3 migration: market price fields (populated via barcode scan lookups)
+alter table public.items
+  add column if not exists market_price_low      numeric,
+  add column if not exists market_price_avg      numeric,
+  add column if not exists market_price_high     numeric,
+  add column if not exists market_price_currency text,
+  add column if not exists market_price_source   text,
+  add column if not exists market_price_updated  timestamptz;
 */
