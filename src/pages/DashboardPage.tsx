@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Package, Star, TrendingUp, MoreVertical, Pencil, Trash2, BarChart2 } from 'lucide-react'
+import { Plus, Package, Star, TrendingUp, MoreVertical, Pencil, Trash2, BarChart2, UserCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { useCollections, useDeleteCollection } from '../hooks/useData'
 import { useAppStore } from '../stores/appStore'
@@ -203,9 +203,13 @@ export default function DashboardPage() {
             className="p-2 rounded-lg text-[#666] hover:text-white hover:bg-white/10 transition-colors touch-target">
             <BarChart2 size={18} />
           </button>
-          <div className="w-8 h-8 rounded-full bg-[#222] border border-[#333] flex items-center justify-center text-xs font-semibold text-[#888]">
-            {initials}
-          </div>
+          <button
+            onClick={() => navigate('/profile')}
+            title="Account settings"
+            className="w-9 h-9 rounded-full bg-[#222] border border-[#333] flex items-center justify-center text-xs font-semibold text-[#888] hover:border-[#555] hover:text-white transition-colors"
+          >
+            {initials || <UserCircle size={16} />}
+          </button>
         </div>
       </header>
 
