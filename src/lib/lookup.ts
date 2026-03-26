@@ -105,8 +105,8 @@ async function tryOpenFoodFacts(barcode: string): Promise<LookupResult | null> {
 
   const tryCode = async (code: string): Promise<LookupResult | null> => {
     try {
-      // v2 API on .net — better data, proper CORS headers
-      const res = await fetch(`https://world.openfoodfacts.net/api/v2/product/${code}?fields=product_name,product_name_en,brands,categories_tags,image_url,image_front_url,image_front_small_url`)
+      // v2 API — richer data than v0, same .org domain
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}?fields=product_name,product_name_en,brands,categories_tags,image_url,image_front_url,image_front_small_url`)
       if (!res.ok) return null
       const data = await res.json()
       if (data.status !== 1 || !data.product) return null
