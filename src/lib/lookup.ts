@@ -129,7 +129,7 @@ async function tryOpenFoodFacts(barcode: string): Promise<LookupResult | null> {
         (p.image_front_small_url as string) ||
         null
 
-      return { barcode, name, brand: (p.brands as string) || '', type, imageUrl }
+      return { barcode, name, brand: (p.brands as string) || '', type, imageUrl: imageUrl ?? undefined }
     } catch { return null }
   }
 
@@ -167,7 +167,7 @@ async function tryGoogleBooks(barcode: string): Promise<LookupResult | null> {
       brand:       (vi.authors as string[] | undefined)?.[0]   ?? '',
       type:        'Book',
       description: (vi.description as string | undefined)?.slice(0, 300) ?? '',
-      imageUrl:    thumbnail,
+      imageUrl:    thumbnail ?? undefined,
       prices: retailPrice != null ? {
         low: null, avg: retailPrice, high: null,
         currency: (si.retailPrice?.currencyCode as string) ?? 'USD',
@@ -220,7 +220,7 @@ async function tryDiscogs(barcode: string): Promise<LookupResult | null> {
       name:     (release.title  as string)                         ?? '',
       brand:    '',
       type:     (release.format as string[] | undefined)?.join(', ') ?? 'Vinyl',
-      imageUrl: (release.cover_image as string) || (release.thumb as string) || null,
+      imageUrl: (release.cover_image as string) || (release.thumb as string) || undefined,
       prices,
     }
   } catch { return null }
