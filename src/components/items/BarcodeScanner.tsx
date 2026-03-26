@@ -21,17 +21,24 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
   const scanning = useRef(false)
   const [status, setStatus] = useState<ScanStatus>('scanning')
   const [errorMsg, setErrorMsg] = useState('')
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [deviceIdx, setDeviceIdx] = useState(0)
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false)
+  // 'environment' = back camera (default), 'user' = front camera
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
   const [result, setResult] = useState<LookupResult | null>(null)
 
   const stopCamera = useCallback(() => {
     scanning.current = false
     controlsRef.current?.stop()
     controlsRef.current = null
+    // Also stop any lingering media tracks directly
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach(t => t.stop())
+      videoRef.current.srcObject = null
+    }
   }, [])
 
-  const startScanning = useCallback(async (devIdx: number) => {
+  const startScanning = useCallback(async (facing: 'environment' | 'user') => {
     stopCamera()
     setStatus('scanning')
     setErrorMsg('')
@@ -39,12 +46,22 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
     scanning.current = true
 
     try {
+      // Check how many cameras are available (to show/hide rotate button)
       const devs = await BrowserMultiFormatReader.listVideoInputDevices()
-      setDevices(devs)
-      const reader = new BrowserMultiFormatReader()
+      setHasMultipleCameras(devs.length > 1)
 
-      const controls = await reader.decodeFromVideoDevice(
-        devs[devIdx]?.deviceId ?? undefined,
+      // Use facingMode constraint — more reliable on iOS than selecting by deviceId
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      })
+
+      const reader = new BrowserMultiFormatReader()
+      const controls = await reader.decodeFromStream(
+        stream,
         videoRef.current!,
         async (res, err) => {
           if (!scanning.current) return
@@ -73,27 +90,33 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
   }, [stopCamera])
 
   useEffect(() => {
-    startScanning(deviceIdx)
+    startScanning(facingMode)
     return stopCamera
-  }, [deviceIdx])
+  }, [facingMode])
+
+  const handleFlip = () => setFacingMode(f => f === 'environment' ? 'user' : 'environment')
 
   const handleConfirm = () => {
     stopCamera()
     onResult(result!)
   }
 
-  const handleRescan = () => startScanning(deviceIdx)
+  const handleRescan = () => startScanning(facingMode)
   const handleClose = () => { stopCamera(); onClose() }
 
   return (
     <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/90 backdrop-blur shrink-0">
+      {/* Header — padded for iOS notch / Dynamic Island */}
+      <div
+        className="flex items-center justify-between px-4 bg-black/90 backdrop-blur shrink-0"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: '12px' }}
+      >
         <span className="text-sm font-medium text-white">Scan Barcode</span>
         <div className="flex items-center gap-2">
-          {devices.length > 1 && status === 'scanning' && (
-            <button onClick={() => setDeviceIdx(i => (i + 1) % devices.length)}
-              className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors">
+          {hasMultipleCameras && status === 'scanning' && (
+            <button onClick={handleFlip}
+              className="p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+              title="Flip camera">
               <RotateCcw size={16} />
             </button>
           )}
@@ -219,7 +242,7 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center bg-[#0a0a0a]">
           <Camera size={40} className="text-[#555]" />
           <p className="text-white/70 text-sm">{errorMsg}</p>
-          <button onClick={() => startScanning(deviceIdx)}
+          <button onClick={() => startScanning(facingMode)}
             className="px-5 py-2.5 bg-white/10 rounded-xl text-sm text-white hover:bg-white/20 transition-colors">
             Try Again
           </button>
